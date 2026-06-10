@@ -44,8 +44,15 @@ export default function PokemonCard({
         {/* Glow circle */}
         <View style={[styles.glow, { backgroundColor: colors.glow + '18' }]} />
 
-        {/* Action buttons */}
+        {/* Action buttons + caught badge */}
         <View style={styles.actions}>
+          {onCaughtToggle && (
+            <TouchableOpacity onPress={onCaughtToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.actionBtn}>
+              <Text style={[styles.actionIcon, isCaught && styles.caughtActive, isSeenOnly && styles.seenActive]}>
+                {isCaught ? '✓' : isSeenOnly ? '◎' : '○'}
+              </Text>
+            </TouchableOpacity>
+          )}
           {onFavToggle && (
             <TouchableOpacity onPress={onFavToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.actionBtn}>
               <Text style={[styles.actionIcon, isFav && styles.favActive]}>
@@ -59,20 +66,6 @@ export default function PokemonCard({
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Caught/Seen badge */}
-        {(isCaught || isSeenOnly || onCaughtToggle) && (
-          <TouchableOpacity
-            onPress={onCaughtToggle}
-            style={styles.caughtBadge}
-            disabled={!onCaughtToggle}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Text style={styles.caughtBadgeText}>
-              {isCaught ? '✓' : isSeenOnly ? '◎' : '○'}
-            </Text>
-          </TouchableOpacity>
-        )}
 
         {/* Number */}
         <Text style={styles.number}>#{String(pokemon.id).padStart(4, '0')}</Text>
@@ -137,9 +130,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionIcon: { fontSize: 13 },
+  actionIcon: { fontSize: 13, color: '#64748B' },
   favActive: { fontSize: 13 },
   compareActive: { fontSize: 13 },
+  caughtActive: { color: '#22C55E' },
+  seenActive: { color: '#818CF8' },
   number: {
     color: '#64748B',
     fontSize: 11,
@@ -174,17 +169,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
   },
-  caughtBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    zIndex: 10,
-  },
-  caughtBadgeText: { color: '#94A3B8', fontSize: 10, fontWeight: '700' },
   borderGlow: {
     position: 'absolute',
     top: 0,
