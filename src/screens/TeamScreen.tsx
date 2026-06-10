@@ -118,8 +118,17 @@ function TeamSlot({
 }
 
 function CoverageAnalysis({ teamIds }: { teamIds: number[] }) {
-  const queries = teamIds.map((id) => usePokemon(id));
-  const teamPokemon = queries.map((q) => q.data).filter(Boolean);
+  // Always call exactly 6 hooks — Rules of Hooks forbids calling inside .map()
+  const q0 = usePokemon(teamIds[0] ?? 0);
+  const q1 = usePokemon(teamIds[1] ?? 0);
+  const q2 = usePokemon(teamIds[2] ?? 0);
+  const q3 = usePokemon(teamIds[3] ?? 0);
+  const q4 = usePokemon(teamIds[4] ?? 0);
+  const q5 = usePokemon(teamIds[5] ?? 0);
+  const teamPokemon = [q0, q1, q2, q3, q4, q5]
+    .slice(0, teamIds.length)
+    .map((q) => q.data)
+    .filter(Boolean);
 
   const coverage = useMemo(() => {
     if (teamPokemon.length === 0) return [];
