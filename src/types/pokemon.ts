@@ -64,6 +64,10 @@ export interface PokemonSpecies {
     language: { name: string };
   }>;
   evolution_chain: { url: string };
+  varieties: Array<{
+    is_default: boolean;
+    pokemon: { name: string; url: string };
+  }>;
 }
 
 export interface EvolutionChain {

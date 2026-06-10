@@ -38,23 +38,50 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 
 const TABS = ['About', 'Stats', 'Evolution', 'Matchup', 'Moves'];
 
+/** Strip base name prefix and map suffix → readable label */
+function formatFormLabel(fullName: string, baseName: string): string {
+  const suffix = fullName.startsWith(baseName + '-')
+    ? fullName.slice(baseName.length + 1)
+    : fullName;
+  const MAP: Record<string, string> = {
+    'mega': 'Mega', 'mega-x': 'Mega X', 'mega-y': 'Mega Y',
+    'alola': 'Alolan', 'galar': 'Galarian', 'hisui': 'Hisuian', 'paldea': 'Paldean',
+    'gmax': 'G-Max', 'origin': 'Origin', 'primal': 'Primal', 'therian': 'Therian',
+    'black': 'Black', 'white': 'White', 'zen': 'Zen', 'dusk': 'Dusk', 'dawn': 'Dawn',
+  };
+  return MAP[suffix] ?? suffix.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 export default function DetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const [tab, setTab] = useState(0);
   const [shiny, setShiny] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [formName, setFormName] = useState<string | null>(null);
 
-  const { data: pokemon, isLoading } = usePokemon(id);
+  const { data: basePokemon, isLoading } = usePokemon(id);
+  // formName === null → usePokemon(0) → enabled:false → undefined
+  const { data: formData } = usePokemon(formName ?? 0);
+  const pokemon = formData ?? basePokemon;
+
   const { data: species } = usePokemonSpecies(id);
   const { data: evoChain } = useEvolutionChain(species?.evolution_chain.url);
 
+  // varieties from species (exclude default + gmax/totem — too many)
+  // Filter out gmax/totem/costume forms — keep meaningful variants only
+  const SKIP = ['gmax', 'totem', 'rock-star', 'belle', 'pop-star', 'phd', 'libre', 'cosplay', 'starter', 'partner'];
+  const variants = (species?.varieties ?? []).filter(
+    (v) => !v.is_default && !SKIP.some((s) => v.pokemon.name.includes(s))
+  );
+
   // useAudioPlayer must be called unconditionally (hook rules)
-  const cryUrl = pokemon
-    ? `https://play.pokemonshowdown.com/audio/cries/${pokemon.name}.mp3`
+  // always use base pokemon name for cry
+  const cryUrl = basePokemon
+    ? `https://play.pokemonshowdown.com/audio/cries/${basePokemon.name}.mp3`
     : null;
   const player = useAudioPlayer(cryUrl ? { uri: cryUrl } : null);
 
-  if (isLoading || !pokemon) {
+  if (isLoading || !pokemon || !basePokemon) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#818CF8" />
@@ -111,6 +138,38 @@ export default function DetailScreen({ route, navigation }: Props) {
           {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}
         </Text>
         <Text style={styles.genus}>{genus}</Text>
+
+        {/* Form selector — only shown when variants exist */}
+        {variants.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.formsScroll}
+            contentContainerStyle={styles.formsRow}
+          >
+            <TouchableOpacity
+              onPress={() => setFormName(null)}
+              style={[styles.formPill, formName === null && styles.formPillActive]}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.formPillText, formName === null && styles.formPillTextActive]}>
+                Base
+              </Text>
+            </TouchableOpacity>
+            {variants.map((v) => (
+              <TouchableOpacity
+                key={v.pokemon.name}
+                onPress={() => setFormName(v.pokemon.name)}
+                style={[styles.formPill, formName === v.pokemon.name && styles.formPillActive]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.formPillText, formName === v.pokemon.name && styles.formPillTextActive]}>
+                  {formatFormLabel(v.pokemon.name, basePokemon.name)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Row 1: Types + Shiny */}
         <View style={styles.typesRow}>
@@ -466,6 +525,22 @@ const styles = StyleSheet.create({
   heroNumber: { color: '#334155', fontSize: 14, fontWeight: '700', letterSpacing: 1, marginTop: 8 },
   heroName: { color: '#F1F5F9', fontSize: 36, fontWeight: '900', letterSpacing: -1 },
   genus: { color: '#64748B', fontSize: 13, marginBottom: 10 },
+  formsScroll: { marginBottom: 8 },
+  formsRow: { flexDirection: 'row', gap: 6, paddingRight: 8 },
+  formPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    backgroundColor: '#1E293B40',
+  },
+  formPillActive: {
+    borderColor: '#818CF8',
+    backgroundColor: '#818CF830',
+  },
+  formPillText: { color: '#64748B', fontSize: 12, fontWeight: '700' },
+  formPillTextActive: { color: '#818CF8' },
   typesRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, gap: 4 },
   actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   actionBadge: {
