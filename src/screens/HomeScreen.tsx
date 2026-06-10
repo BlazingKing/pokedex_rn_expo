@@ -5,20 +5,19 @@ import {
   StyleSheet,
   FlatList,
   TextInput,
-  TouchableOpacity,
   ActivityIndicator,
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { usePokemonList, usePokemon } from '../hooks/usePokemon';
+import { usePokemonList, usePokemon, usePokemonByGen } from '../hooks/usePokemon';
 import { getPokemonId } from '../utils/pokemon';
 import PokemonCard from '../components/PokemonCard';
 import PokemonCardSkeleton from '../components/PokemonCardSkeleton';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
-import type { Pokemon } from '../types/pokemon';
 import { useQuery } from '@tanstack/react-query';
 import { searchPokemon } from '../api/pokemon';
+import { GENERATIONS, GEN_KEYS } from '../constants/generations';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -31,9 +30,17 @@ const TYPE_FILTERS = ['all', 'fire', 'water', 'grass', 'electric', 'psychic', 'd
 export default function HomeScreen({ navigation }: Props) {
   const [search, setSearch] = useState('');
   const [activeType, setActiveType] = useState('all');
+  const [activeGen, setActiveGen] = useState('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = usePokemonList();
+  const genInfo = GENERATIONS[activeGen];
+  const isGenFiltered = activeGen !== 'all';
+
+  // Infinite list — used when no gen filter
+  const { data: infiniteData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isInfiniteLoading } = usePokemonList();
+
+  // Gen-specific list — used when a gen is selected
+  const { data: genData, isLoading: isGenLoading } = usePokemonByGen(genInfo);
 
   const { data: searchResult, isLoading: isSearching } = useQuery({
     queryKey: ['search', debouncedSearch],
@@ -44,24 +51,42 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleSearch = useCallback((text: string) => {
     setSearch(text);
-    const timeout = setTimeout(() => setDebouncedSearch(text), 500);
-    return () => clearTimeout(timeout);
+    const timer = setTimeout(() => setDebouncedSearch(text), 500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const allPokemonUrls = useMemo(
-    () => data?.pages.flatMap((p) => p.results) ?? [],
-    [data]
+  const handleGenChange = useCallback((gen: string) => {
+    setActiveGen(gen);
+    setActiveType('all'); // reset type filter when switching gen
+  }, []);
+
+  const allPokemonUrls = useMemo(() => {
+    if (isGenFiltered) return genData?.results ?? [];
+    return infiniteData?.pages.flatMap((p) => p.results) ?? [];
+  }, [isGenFiltered, genData, infiniteData]);
+
+  const isLoading = isGenFiltered ? isGenLoading : isInfiniteLoading;
+
+  const renderItem = useCallback(
+    ({ item }: { item: { name: string; url: string } }) => {
+      const id = getPokemonId(item.url);
+      return <PokemonCardItem id={id} navigation={navigation} typeFilter={activeType} />;
+    },
+    [navigation, activeType]
   );
 
-  const renderItem = useCallback(({ item, index }: { item: { name: string; url: string }; index: number }) => {
-    const id = getPokemonId(item.url);
-    return <PokemonCardItem id={id} navigation={navigation} typeFilter={activeType} />;
-  }, [navigation, activeType]);
-
+  // Search mode
   if (debouncedSearch.length > 2) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header search={search} onSearch={handleSearch} activeType={activeType} onTypeChange={setActiveType} />
+        <Header
+          search={search}
+          onSearch={handleSearch}
+          activeType={activeType}
+          onTypeChange={setActiveType}
+          activeGen={activeGen}
+          onGenChange={handleGenChange}
+        />
         {isSearching ? (
           <ActivityIndicator color="#818CF8" style={{ marginTop: 40 }} />
         ) : searchResult ? (
@@ -80,7 +105,28 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header search={search} onSearch={handleSearch} activeType={activeType} onTypeChange={setActiveType} />
+      <Header
+        search={search}
+        onSearch={handleSearch}
+        activeType={activeType}
+        onTypeChange={setActiveType}
+        activeGen={activeGen}
+        onGenChange={handleGenChange}
+      />
+
+      {/* Gen region label */}
+      {isGenFiltered && (
+        <View style={styles.genBanner}>
+          <View style={[styles.genBannerDot, { backgroundColor: genInfo.glow }]} />
+          <Text style={[styles.genBannerText, { color: genInfo.glow }]}>
+            {genInfo.region}
+          </Text>
+          <Text style={styles.genBannerCount}>
+            {genData ? `${genData.results.length} Pokémon` : ''}
+          </Text>
+        </View>
+      )}
+
       {isLoading ? (
         <View style={styles.grid}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -94,9 +140,13 @@ export default function HomeScreen({ navigation }: Props) {
           keyExtractor={(item) => item.name}
           numColumns={2}
           contentContainerStyle={styles.listContent}
-          onEndReached={() => hasNextPage && fetchNextPage()}
+          onEndReached={() => !isGenFiltered && hasNextPage && fetchNextPage()}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color="#818CF8" style={{ marginVertical: 16 }} /> : null}
+          ListFooterComponent={
+            isFetchingNextPage && !isGenFiltered
+              ? <ActivityIndicator color="#818CF8" style={{ marginVertical: 16 }} />
+              : null
+          }
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -134,12 +184,18 @@ function Header({
   onSearch,
   activeType,
   onTypeChange,
+  activeGen,
+  onGenChange,
 }: {
   search: string;
   onSearch: (t: string) => void;
   activeType: string;
   onTypeChange: (t: string) => void;
+  activeGen: string;
+  onGenChange: (g: string) => void;
 }) {
+  const activeGenInfo = GENERATIONS[activeGen];
+
   return (
     <View style={styles.header}>
       <Text style={styles.title}>Pokédex</Text>
@@ -159,13 +215,39 @@ function Header({
         />
       </View>
 
+      {/* Gen Filter */}
+      <FlatList
+        data={GEN_KEYS}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item}
+        style={styles.filterList}
+        renderItem={({ item }) => {
+          const info = GENERATIONS[item];
+          const isActive = activeGen === item;
+          return (
+            <Pressable
+              onPress={() => onGenChange(item)}
+              style={[
+                styles.genChip,
+                isActive && { backgroundColor: info.glow + '25', borderColor: info.glow },
+              ]}
+            >
+              <Text style={[styles.genChipText, isActive && { color: info.glow }]}>
+                {info.label}
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
+
       {/* Type Filter */}
       <FlatList
         data={TYPE_FILTERS}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item}
-        style={styles.typeList}
+        style={styles.filterList}
         renderItem={({ item }) => (
           <Pressable
             onPress={() => onTypeChange(item)}
@@ -204,7 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#1E293B',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: {
@@ -212,7 +294,22 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     fontSize: 15,
   },
-  typeList: { marginBottom: 4 },
+  filterList: { marginBottom: 8 },
+  genChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  genChipText: {
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
   typeChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -233,6 +330,28 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   typeChipTextActive: { color: '#FFFFFF' },
+  genBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  genBannerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  genBannerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  genBannerCount: {
+    color: '#475569',
+    fontSize: 12,
+    marginLeft: 'auto',
+  },
   listContent: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 30 },
   grid: {
     flexDirection: 'row',
