@@ -1,0 +1,317 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { usePokemon, usePokemonSpecies, useEvolutionChain } from '../hooks/usePokemon';
+import {
+  getPokemonImageUrl,
+  formatHeight,
+  formatWeight,
+  getEnglishFlavorText,
+  flattenEvolutionChain,
+  getPokemonId,
+} from '../utils/pokemon';
+import { TYPE_COLORS } from '../constants/typeColors';
+import TypeBadge from '../components/TypeBadge';
+import StatBar from '../components/StatBar';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../types/navigation';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
+
+const TABS = ['About', 'Stats', 'Evolution'];
+
+export default function DetailScreen({ route, navigation }: Props) {
+  const { id } = route.params;
+  const [tab, setTab] = useState(0);
+  const [shiny, setShiny] = useState(false);
+
+  const { data: pokemon, isLoading } = usePokemon(id);
+  const { data: species } = usePokemonSpecies(id);
+  const { data: evoChain } = useEvolutionChain(species?.evolution_chain.url);
+
+  if (isLoading || !pokemon) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#818CF8" />
+      </View>
+    );
+  }
+
+  const primaryType = pokemon.types[0]?.type.name ?? 'normal';
+  const colors = TYPE_COLORS[primaryType] ?? TYPE_COLORS.normal;
+  const imageUrl = shiny
+    ? pokemon.sprites.other['official-artwork'].front_shiny ?? getPokemonImageUrl(pokemon.id)
+    : getPokemonImageUrl(pokemon.id);
+  const flavorText = species ? getEnglishFlavorText(species.flavor_text_entries) : '';
+  const genus = species?.genera.find((g) => g.language.name === 'en')?.genus ?? '';
+
+  const evolutionNames = evoChain ? flattenEvolutionChain(evoChain.chain) : [];
+
+  return (
+    <View style={styles.root}>
+      {/* Hero */}
+      <LinearGradient
+        colors={[colors.bg + '80', colors.bg + '20', '#080F1E']}
+        style={styles.hero}
+      >
+        {/* Back button */}
+        <SafeAreaView edges={['top']}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+
+        {/* Pokémon number */}
+        <Text style={styles.heroNumber}>#{String(pokemon.id).padStart(4, '0')}</Text>
+        <Text style={styles.heroName}>
+          {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}
+        </Text>
+        <Text style={styles.genus}>{genus}</Text>
+
+        {/* Types */}
+        <View style={styles.typesRow}>
+          {pokemon.types.map((t) => (
+            <TypeBadge key={t.type.name} type={t.type.name} />
+          ))}
+        </View>
+
+        {/* Glow orb */}
+        <View style={[styles.glowOrb, { backgroundColor: colors.glow + '20' }]} />
+
+        {/* Pokémon image */}
+        <TouchableOpacity onPress={() => setShiny((s) => !s)} activeOpacity={0.9}>
+          <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="contain" />
+          {shiny && (
+            <View style={styles.shinyBadge}>
+              <Text style={styles.shinyText}>✨ SHINY</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </LinearGradient>
+
+      {/* Card */}
+      <ScrollView style={styles.card} showsVerticalScrollIndicator={false}>
+        {/* Tabs */}
+        <View style={styles.tabs}>
+          {TABS.map((t, i) => (
+            <TouchableOpacity
+              key={t}
+              onPress={() => setTab(i)}
+              style={[styles.tab, tab === i && { borderBottomColor: colors.glow }]}
+            >
+              <Text style={[styles.tabText, tab === i && { color: colors.glow }]}>{t}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.tabContent}>
+          {tab === 0 && <AboutTab pokemon={pokemon} flavorText={flavorText} />}
+          {tab === 1 && <StatsTab pokemon={pokemon} />}
+          {tab === 2 && <EvoTab names={evolutionNames} currentName={pokemon.name} onPress={(name) => navigation.replace('Detail', { id: name, name })} />}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function AboutTab({ pokemon, flavorText }: { pokemon: any; flavorText: string }) {
+  return (
+    <View style={styles.aboutContainer}>
+      {flavorText ? <Text style={styles.flavorText}>{flavorText}</Text> : null}
+      <View style={styles.infoGrid}>
+        <InfoBox label="Height" value={formatHeight(pokemon.height)} />
+        <InfoBox label="Weight" value={formatWeight(pokemon.weight)} />
+        <InfoBox label="Base XP" value={String(pokemon.base_experience ?? '—')} />
+        <InfoBox label="Abilities" value={pokemon.abilities.map((a: any) => a.ability.name).join(', ')} />
+      </View>
+    </View>
+  );
+}
+
+function InfoBox({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoBox}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
+function StatsTab({ pokemon }: { pokemon: any }) {
+  const total = pokemon.stats.reduce((sum: number, s: any) => sum + s.base_stat, 0);
+  return (
+    <View style={styles.statsContainer}>
+      {pokemon.stats.map((s: any) => (
+        <StatBar key={s.stat.name} name={s.stat.name} value={s.base_stat} />
+      ))}
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>TOTAL</Text>
+        <Text style={styles.totalValue}>{total}</Text>
+      </View>
+    </View>
+  );
+}
+
+function EvoTab({ names, currentName, onPress }: { names: string[]; currentName: string; onPress: (name: string) => void }) {
+  if (names.length === 0) return <ActivityIndicator color="#818CF8" style={{ marginTop: 40 }} />;
+
+  return (
+    <View style={styles.evoContainer}>
+      {names.map((name, i) => (
+        <React.Fragment key={name}>
+          <EvoStage name={name} isCurrent={name === currentName} onPress={() => name !== currentName && onPress(name)} />
+          {i < names.length - 1 && <Text style={styles.evoArrow}>↓</Text>}
+        </React.Fragment>
+      ))}
+    </View>
+  );
+}
+
+function EvoStage({ name, isCurrent, onPress }: { name: string; isCurrent: boolean; onPress: () => void }) {
+  const id = getPokemonId(`https://pokeapi.co/api/v2/pokemon-species/${name}/`);
+  const { data: poke } = usePokemon(name);
+  const imageUrl = poke ? getPokemonImageUrl(poke.id) : null;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.evoStage, isCurrent && styles.evoStageCurrent]}
+      disabled={isCurrent}
+    >
+      {imageUrl && <Image source={{ uri: imageUrl }} style={styles.evoImage} resizeMode="contain" />}
+      <Text style={[styles.evoName, isCurrent && styles.evoNameCurrent]}>
+        {name.charAt(0).toUpperCase() + name.slice(1)}
+      </Text>
+      {isCurrent && <Text style={styles.evoCurrent}>Current</Text>}
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#080F1E' },
+  loading: { flex: 1, backgroundColor: '#080F1E', justifyContent: 'center', alignItems: 'center' },
+  hero: {
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    minHeight: 300,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#1E293B80',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  backIcon: { color: '#F1F5F9', fontSize: 20 },
+  heroNumber: { color: '#334155', fontSize: 14, fontWeight: '700', letterSpacing: 1, marginTop: 8 },
+  heroName: { color: '#F1F5F9', fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  genus: { color: '#64748B', fontSize: 13, marginBottom: 10 },
+  typesRow: { flexDirection: 'row', marginBottom: 12 },
+  glowOrb: {
+    position: 'absolute',
+    right: -40,
+    top: 40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  heroImage: {
+    width: SCREEN_W * 0.55,
+    height: SCREEN_W * 0.55,
+    alignSelf: 'center',
+  },
+  shinyBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 40,
+    backgroundColor: '#EAB30833',
+    borderColor: '#FACC1566',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  shinyText: { color: '#FACC15', fontSize: 11, fontWeight: '700' },
+  card: {
+    flex: 1,
+    backgroundColor: '#080F1E',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -30,
+  },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: { color: '#475569', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  tabContent: { padding: 24 },
+  aboutContainer: { gap: 16 },
+  flavorText: { color: '#94A3B8', fontSize: 14, lineHeight: 22, fontStyle: 'italic' },
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  infoBox: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  infoLabel: { color: '#475569', fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
+  infoValue: { color: '#E2E8F0', fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
+  statsContainer: { gap: 4 },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+  },
+  totalLabel: { color: '#64748B', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  totalValue: { color: '#F1F5F9', fontSize: 18, fontWeight: '900' },
+  evoContainer: { alignItems: 'center', gap: 8 },
+  evoStage: {
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    width: 160,
+  },
+  evoStageCurrent: {
+    borderColor: '#818CF8',
+    backgroundColor: '#818CF820',
+  },
+  evoImage: { width: 80, height: 80 },
+  evoName: { color: '#94A3B8', fontSize: 14, fontWeight: '700', textTransform: 'capitalize', marginTop: 4 },
+  evoNameCurrent: { color: '#F1F5F9' },
+  evoCurrent: { color: '#818CF8', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 2 },
+  evoArrow: { color: '#334155', fontSize: 20 },
+});
