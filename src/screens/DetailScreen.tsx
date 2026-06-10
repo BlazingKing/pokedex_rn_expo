@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { usePokemon, usePokemonSpecies, useEvolutionChain } from '../hooks/usePokemon';
+import { usePokemon, usePokemonSpecies, useEvolutionChain, useMoveDetail } from '../hooks/usePokemon';
 import {
   getPokemonImageUrl,
   formatHeight,
@@ -21,7 +23,7 @@ import {
   getEnglishFlavorText,
   flattenEvolutionChain,
 } from '../utils/pokemon';
-import type { EvoStageInfo } from '../types/pokemon';
+import type { EvoStageInfo, PokemonMove } from '../types/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import TypeBadge from '../components/TypeBadge';
 import StatBar from '../components/StatBar';
@@ -34,7 +36,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 
-const TABS = ['About', 'Stats', 'Evolution', 'Matchup'];
+const TABS = ['About', 'Stats', 'Evolution', 'Matchup', 'Moves'];
 
 export default function DetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
@@ -175,6 +177,7 @@ export default function DetailScreen({ route, navigation }: Props) {
           {tab === 1 && <StatsTab pokemon={pokemon} />}
           {tab === 2 && <EvoTab stages={evoStages} currentName={pokemon.name} onPress={(name) => navigation.replace('Detail', { id: name, name })} />}
           {tab === 3 && <MatchupTab types={pokemon.types.map((t) => t.type.name)} />}
+          {tab === 4 && <MovesTab moves={pokemon.moves} />}
         </View>
       </ScrollView>
     </View>
@@ -291,6 +294,134 @@ function MatchupTab({ types }: { types: string[] }) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+type MoveGroup = { label: string; moves: Array<{ name: string; level: number }> };
+
+function groupMoves(moves: PokemonMove[]): MoveGroup[] {
+  const levelUp: Array<{ name: string; level: number }> = [];
+  const machine: Array<{ name: string; level: number }> = [];
+  const egg: Array<{ name: string; level: number }> = [];
+  const tutor: Array<{ name: string; level: number }> = [];
+  const other: Array<{ name: string; level: number }> = [];
+
+  for (const pm of moves) {
+    const details = pm.version_group_details;
+    if (details.length === 0) { other.push({ name: pm.move.name, level: 0 }); continue; }
+    const last = details[details.length - 1];
+    const method = last.move_learn_method.name;
+    const level = last.level_learned_at;
+    if (method === 'level-up') levelUp.push({ name: pm.move.name, level });
+    else if (method === 'machine') machine.push({ name: pm.move.name, level });
+    else if (method === 'egg') egg.push({ name: pm.move.name, level });
+    else if (method === 'tutor') tutor.push({ name: pm.move.name, level });
+    else other.push({ name: pm.move.name, level });
+  }
+  levelUp.sort((a, b) => a.level - b.level);
+  const result: MoveGroup[] = [];
+  if (levelUp.length) result.push({ label: 'Level Up', moves: levelUp });
+  if (machine.length) result.push({ label: 'TM/HM', moves: machine });
+  if (egg.length) result.push({ label: 'Egg', moves: egg });
+  if (tutor.length) result.push({ label: 'Tutor', moves: tutor });
+  if (other.length) result.push({ label: 'Other', moves: other });
+  return result;
+}
+
+function MovesTab({ moves }: { moves: PokemonMove[] }) {
+  const groups = groupMoves(moves);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ 'Level Up': true });
+  const [selectedMove, setSelectedMove] = useState<string | null>(null);
+
+  return (
+    <View style={styles.movesContainer}>
+      {groups.map((group) => (
+        <View key={group.label} style={styles.moveGroup}>
+          <TouchableOpacity
+            style={styles.moveGroupHeader}
+            onPress={() => setExpanded((prev) => ({ ...prev, [group.label]: !prev[group.label] }))}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.moveGroupLabel}>{group.label}</Text>
+            <Text style={styles.moveGroupCount}>
+              {group.moves.length} {expanded[group.label] ? '▲' : '▼'}
+            </Text>
+          </TouchableOpacity>
+          {expanded[group.label] && group.moves.map((m) => (
+            <TouchableOpacity
+              key={m.name}
+              style={styles.moveRow}
+              onPress={() => setSelectedMove(m.name)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.moveLevelBadge}>
+                <Text style={styles.moveLevelText}>
+                  {group.label === 'Level Up' ? (m.level > 0 ? String(m.level) : 'E') : '—'}
+                </Text>
+              </View>
+              <Text style={styles.moveName}>
+                {m.name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              </Text>
+              <Text style={styles.moveHint}>ⓘ</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ))}
+      <MoveDetailModal moveName={selectedMove} onClose={() => setSelectedMove(null)} />
+    </View>
+  );
+}
+
+function MoveDetailModal({ moveName, onClose }: { moveName: string | null; onClose: () => void }) {
+  const { data: move, isLoading } = useMoveDetail(moveName ?? '');
+
+  const effectEntry = move?.effect_entries?.find((e: any) => e.language.name === 'en');
+  const shortEffect = effectEntry?.short_effect ?? '';
+
+  const categoryIcon = move?.damage_class?.name === 'physical' ? '⚔️'
+    : move?.damage_class?.name === 'special' ? '✨'
+    : '🛡️';
+
+  return (
+    <Modal visible={!!moveName} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalCard} onPress={() => {}}>
+          {isLoading || !move ? (
+            <ActivityIndicator color="#818CF8" style={{ padding: 32 }} />
+          ) : (
+            <>
+              <Text style={styles.modalMoveName}>
+                {move.name.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              </Text>
+              <View style={styles.modalRow}>
+                <TypeBadge type={move.type.name} />
+                <View style={styles.modalCategoryBadge}>
+                  <Text style={styles.modalCategoryText}>{categoryIcon} {move.damage_class.name}</Text>
+                </View>
+              </View>
+              <View style={styles.modalStats}>
+                <ModalStatBox label="Power" value={move.power != null ? String(move.power) : '—'} />
+                <ModalStatBox label="Accuracy" value={move.accuracy != null ? `${move.accuracy}%` : '—'} />
+                <ModalStatBox label="PP" value={String(move.pp)} />
+              </View>
+              {shortEffect ? <Text style={styles.modalEffect}>{shortEffect}</Text> : null}
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+                <Text style={styles.modalCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function ModalStatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.modalStatBox}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
 }
@@ -463,4 +594,78 @@ const styles = StyleSheet.create({
   matchupMultiplier: { fontSize: 18, fontWeight: '900', minWidth: 36 },
   matchupLabel: { color: '#64748B', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   matchupTypes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  movesContainer: { gap: 12 },
+  moveGroup: { gap: 2 },
+  moveGroupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  moveGroupLabel: { color: '#94A3B8', fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  moveGroupCount: { color: '#475569', fontSize: 11, fontWeight: '700' },
+  moveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B20',
+    gap: 12,
+  },
+  moveLevelBadge: {
+    width: 32,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moveLevelText: { color: '#818CF8', fontSize: 11, fontWeight: '800' },
+  moveName: { flex: 1, color: '#E2E8F0', fontSize: 13, fontWeight: '600', textTransform: 'capitalize' },
+  moveHint: { color: '#334155', fontSize: 14 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: '#00000099',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#111827',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 40,
+    gap: 14,
+  },
+  modalMoveName: { color: '#F1F5F9', fontSize: 22, fontWeight: '900', letterSpacing: -0.5, textTransform: 'capitalize' },
+  modalRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  modalCategoryBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+  },
+  modalCategoryText: { color: '#94A3B8', fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  modalStats: { flexDirection: 'row', gap: 10 },
+  modalStatBox: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  modalEffect: { color: '#94A3B8', fontSize: 13, lineHeight: 20 },
+  modalCloseBtn: {
+    backgroundColor: '#818CF8',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalCloseBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 });
