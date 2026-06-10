@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTeam } from '../context/TeamContext';
 import { usePokemon, usePokemonList } from '../hooks/usePokemon';
+import { useQuery } from '@tanstack/react-query';
+import { searchPokemon } from '../api/pokemon';
 import { getPokemonImageUrl, getPokemonId } from '../utils/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import { ATTACK_CHART, ALL_TYPES } from '../constants/typeMatchup';
@@ -222,19 +224,35 @@ function CoverageAnalysis({ teamIds }: { teamIds: number[] }) {
 
 function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const { addMember, removeMember, isInTeam, isFull } = useTeam();
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = usePokemonList();
 
-  const allPokemon = useMemo(
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const isSearching = debouncedQuery.length > 1;
+
+  const { data: searchResult, isLoading: isSearchLoading } = useQuery({
+    queryKey: ['picker-search', debouncedQuery],
+    queryFn: () => searchPokemon(debouncedQuery),
+    enabled: isSearching,
+    retry: false,
+  });
+
+  const infiniteList = useMemo(
     () => data?.pages.flatMap((p) => p.results) ?? [],
     [data]
   );
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return allPokemon;
-    const q = query.toLowerCase();
-    return allPokemon.filter((p) => p.name.includes(q));
-  }, [query, allPokemon]);
+  // When searching: show the single result (or empty); otherwise show infinite list
+  const listData = useMemo(() => {
+    if (!isSearching) return infiniteList;
+    if (searchResult) return [{ name: searchResult.name, url: `https://pokeapi.co/api/v2/pokemon/${searchResult.id}/` }];
+    return [];
+  }, [isSearching, searchResult, infiniteList]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -259,12 +277,19 @@ function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: (
         </View>
 
         <FlatList
-          data={filtered}
+          data={listData}
           keyExtractor={(item) => item.name}
           numColumns={2}
           contentContainerStyle={styles.pickerGrid}
-          onEndReached={() => { if (hasNextPage && !query) fetchNextPage(); }}
+          onEndReached={() => { if (!isSearching && hasNextPage) fetchNextPage(); }}
           onEndReachedThreshold={0.4}
+          ListEmptyComponent={
+            isSearchLoading
+              ? <ActivityIndicator color="#818CF8" style={{ marginTop: 40 }} />
+              : isSearching
+              ? <Text style={styles.notFound}>No Pokémon found for "{debouncedQuery}"</Text>
+              : null
+          }
           ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color="#818CF8" style={{ marginVertical: 16 }} /> : null}
           renderItem={({ item }) => {
             const id = getPokemonId(item.url);
@@ -433,7 +458,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  pickerGrid: { paddingHorizontal: 6 },
+  pickerGrid: { paddingHorizontal: 6, flexGrow: 1 },
+  notFound: { color: '#475569', textAlign: 'center', marginTop: 40, fontSize: 14 },
   pickerItemWrapper: { flex: 1 },
   pickerItemPlaceholder: { flex: 1, margin: 6, minHeight: 180 },
   pickerItemDisabled: { opacity: 0.35 },
