@@ -19,8 +19,8 @@ import {
   formatWeight,
   getEnglishFlavorText,
   flattenEvolutionChain,
-  getPokemonId,
 } from '../utils/pokemon';
+import type { EvoStageInfo } from '../types/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import TypeBadge from '../components/TypeBadge';
 import StatBar from '../components/StatBar';
@@ -58,7 +58,7 @@ export default function DetailScreen({ route, navigation }: Props) {
   const flavorText = species ? getEnglishFlavorText(species.flavor_text_entries) : '';
   const genus = species?.genera.find((g) => g.language.name === 'en')?.genus ?? '';
 
-  const evolutionNames = evoChain ? flattenEvolutionChain(evoChain.chain) : [];
+  const evoStages = evoChain ? flattenEvolutionChain(evoChain.chain) : [];
 
   return (
     <View style={styles.root}>
@@ -81,25 +81,25 @@ export default function DetailScreen({ route, navigation }: Props) {
         </Text>
         <Text style={styles.genus}>{genus}</Text>
 
-        {/* Types */}
+        {/* Types + Shiny badge */}
         <View style={styles.typesRow}>
           {pokemon.types.map((t) => (
             <TypeBadge key={t.type.name} type={t.type.name} />
           ))}
+          <TouchableOpacity
+            onPress={() => setShiny((s) => !s)}
+            style={[styles.shinyBadge, shiny && styles.shinyBadgeActive]}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.shinyText, shiny && styles.shinyTextActive]}>✨ SHINY</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Glow orb */}
         <View style={[styles.glowOrb, { backgroundColor: colors.glow + '20' }]} />
 
         {/* Pokémon image */}
-        <TouchableOpacity onPress={() => setShiny((s) => !s)} activeOpacity={0.9}>
-          <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="contain" />
-          {shiny && (
-            <View style={styles.shinyBadge}>
-              <Text style={styles.shinyText}>✨ SHINY</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="contain" />
       </LinearGradient>
 
       {/* Card */}
@@ -120,7 +120,7 @@ export default function DetailScreen({ route, navigation }: Props) {
         <View style={styles.tabContent}>
           {tab === 0 && <AboutTab pokemon={pokemon} flavorText={flavorText} />}
           {tab === 1 && <StatsTab pokemon={pokemon} />}
-          {tab === 2 && <EvoTab names={evolutionNames} currentName={pokemon.name} onPress={(name) => navigation.replace('Detail', { id: name, name })} />}
+          {tab === 2 && <EvoTab stages={evoStages} currentName={pokemon.name} onPress={(name) => navigation.replace('Detail', { id: name, name })} />}
         </View>
       </ScrollView>
     </View>
@@ -165,15 +165,40 @@ function StatsTab({ pokemon }: { pokemon: any }) {
   );
 }
 
-function EvoTab({ names, currentName, onPress }: { names: string[]; currentName: string; onPress: (name: string) => void }) {
-  if (names.length === 0) return <ActivityIndicator color="#818CF8" style={{ marginTop: 40 }} />;
+function EvoTab({ stages, currentName, onPress }: { stages: EvoStageInfo[]; currentName: string; onPress: (name: string) => void }) {
+  if (stages.length === 0) return <ActivityIndicator color="#818CF8" style={{ marginTop: 40 }} />;
 
   return (
     <View style={styles.evoContainer}>
-      {names.map((name, i) => (
-        <React.Fragment key={name}>
-          <EvoStage name={name} isCurrent={name === currentName} onPress={() => name !== currentName && onPress(name)} />
-          {i < names.length - 1 && <Text style={styles.evoArrow}>↓</Text>}
+      {stages.map((stage, i) => (
+        <React.Fragment key={stage.name}>
+          <EvoStage
+            name={stage.name}
+            isCurrent={stage.name === currentName}
+            onPress={() => stage.name !== currentName && onPress(stage.name)}
+          />
+          {i < stages.length - 1 && (
+            <View style={styles.evoArrowRow}>
+              <Text style={styles.evoArrow}>↓</Text>
+              {stages[i + 1].minLevel !== null ? (
+                <View style={styles.evoLevelBadge}>
+                  <Text style={styles.evoLevelText}>Lv. {stages[i + 1].minLevel}</Text>
+                </View>
+              ) : stages[i + 1].trigger === 'trade' ? (
+                <View style={styles.evoLevelBadge}>
+                  <Text style={styles.evoLevelText}>Trade</Text>
+                </View>
+              ) : stages[i + 1].trigger === 'use-item' ? (
+                <View style={styles.evoLevelBadge}>
+                  <Text style={styles.evoLevelText}>Item</Text>
+                </View>
+              ) : (
+                <View style={styles.evoLevelBadge}>
+                  <Text style={styles.evoLevelText}>Special</Text>
+                </View>
+              )}
+            </View>
+          )}
         </React.Fragment>
       ))}
     </View>
@@ -181,7 +206,6 @@ function EvoTab({ names, currentName, onPress }: { names: string[]; currentName:
 }
 
 function EvoStage({ name, isCurrent, onPress }: { name: string; isCurrent: boolean; onPress: () => void }) {
-  const id = getPokemonId(`https://pokeapi.co/api/v2/pokemon-species/${name}/`);
   const { data: poke } = usePokemon(name);
   const imageUrl = poke ? getPokemonImageUrl(poke.id) : null;
 
@@ -195,7 +219,7 @@ function EvoStage({ name, isCurrent, onPress }: { name: string; isCurrent: boole
       <Text style={[styles.evoName, isCurrent && styles.evoNameCurrent]}>
         {name.charAt(0).toUpperCase() + name.slice(1)}
       </Text>
-      {isCurrent && <Text style={styles.evoCurrent}>Current</Text>}
+      {isCurrent && <Text style={styles.evoCurrent}>CURRENT</Text>}
     </TouchableOpacity>
   );
 }
@@ -236,17 +260,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   shinyBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 40,
-    backgroundColor: '#EAB30833',
-    borderColor: '#FACC1566',
-    borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: '#EAB30820',
+    borderColor: '#FACC1540',
+    marginRight: 6,
   },
-  shinyText: { color: '#FACC15', fontSize: 11, fontWeight: '700' },
+  shinyBadgeActive: {
+    backgroundColor: '#EAB30840',
+    borderColor: '#FACC15AA',
+  },
+  shinyText: { color: '#64748B', fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  shinyTextActive: { color: '#FACC15' },
   card: {
     flex: 1,
     backgroundColor: '#080F1E',
@@ -313,5 +340,15 @@ const styles = StyleSheet.create({
   evoName: { color: '#94A3B8', fontSize: 14, fontWeight: '700', textTransform: 'capitalize', marginTop: 4 },
   evoNameCurrent: { color: '#F1F5F9' },
   evoCurrent: { color: '#818CF8', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 2 },
+  evoArrowRow: { alignItems: 'center', gap: 4 },
   evoArrow: { color: '#334155', fontSize: 20 },
+  evoLevelBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  evoLevelText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
 });

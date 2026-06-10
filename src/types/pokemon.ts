@@ -65,7 +65,20 @@ export interface EvolutionChain {
   chain: EvolutionLink;
 }
 
+export interface EvolutionDetail {
+  min_level: number | null;
+  trigger: { name: string };
+  item: { name: string } | null;
+}
+
 export interface EvolutionLink {
   species: { name: string; url: string };
+  evolution_details: EvolutionDetail[];
   evolves_to: EvolutionLink[];
+}
+
+export interface EvoStageInfo {
+  name: string;
+  minLevel: number | null;
+  trigger: string | null;
 }
