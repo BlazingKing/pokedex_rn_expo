@@ -3,15 +3,26 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TYPE_COLORS } from '../constants/typeColors';
 import TypeBadge from './TypeBadge';
-import { getPokemonImageUrl, getPokemonId } from '../utils/pokemon';
+import { getPokemonImageUrl } from '../utils/pokemon';
 import type { Pokemon } from '../types/pokemon';
 
 interface Props {
   pokemon: Pokemon;
   onPress: () => void;
+  isFav?: boolean;
+  onFavToggle?: () => void;
+  isCompareSelected?: boolean;
+  onCompareToggle?: () => void;
 }
 
-export default function PokemonCard({ pokemon, onPress }: Props) {
+export default function PokemonCard({
+  pokemon,
+  onPress,
+  isFav = false,
+  onFavToggle,
+  isCompareSelected = false,
+  onCompareToggle,
+}: Props) {
   const primaryType = pokemon.types[0]?.type.name ?? 'normal';
   const colors = TYPE_COLORS[primaryType] ?? TYPE_COLORS.normal;
   const imageUrl = getPokemonImageUrl(pokemon.id);
@@ -22,20 +33,32 @@ export default function PokemonCard({ pokemon, onPress }: Props) {
         colors={[colors.bg + '40', '#0F172A', '#0F172A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.card}
+        style={[styles.card, isCompareSelected && { borderColor: colors.glow + '80', borderWidth: 1.5 }]}
       >
         {/* Glow circle */}
         <View style={[styles.glow, { backgroundColor: colors.glow + '18' }]} />
+
+        {/* Action buttons */}
+        <View style={styles.actions}>
+          {onFavToggle && (
+            <TouchableOpacity onPress={onFavToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.actionBtn}>
+              <Text style={[styles.actionIcon, isFav && styles.favActive]}>
+                {isFav ? '❤️' : '🤍'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onCompareToggle && (
+            <TouchableOpacity onPress={onCompareToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.actionBtn}>
+              <Text style={[styles.actionIcon, isCompareSelected && styles.compareActive]}>⚖️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Number */}
         <Text style={styles.number}>#{String(pokemon.id).padStart(4, '0')}</Text>
 
         {/* Image */}
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.image}
-          resizeMode="contain"
-        />
+        <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="contain" />
 
         {/* Info */}
         <View style={styles.info}>
@@ -47,7 +70,11 @@ export default function PokemonCard({ pokemon, onPress }: Props) {
           </View>
         </View>
 
-        {/* Border glow */}
+        {/* Compare selected overlay */}
+        {isCompareSelected && (
+          <View style={[styles.selectedRing, { borderColor: colors.glow }]} />
+        )}
+
         <View style={[styles.borderGlow, { borderColor: colors.glow + '30' }]} />
       </LinearGradient>
     </TouchableOpacity>
@@ -74,6 +101,25 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
   },
+  actions: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    gap: 4,
+    zIndex: 10,
+  },
+  actionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#0F172A80',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionIcon: { fontSize: 13 },
+  favActive: { fontSize: 13 },
+  compareActive: { fontSize: 13 },
   number: {
     color: '#64748B',
     fontSize: 11,
@@ -98,6 +144,15 @@ const styles = StyleSheet.create({
   types: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+  },
+  selectedRing: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    borderWidth: 2,
   },
   borderGlow: {
     position: 'absolute',
