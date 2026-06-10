@@ -10,8 +10,11 @@ import HomeScreen from './src/screens/HomeScreen';
 import DetailScreen from './src/screens/DetailScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import CompareScreen from './src/screens/CompareScreen';
+import QuizScreen from './src/screens/QuizScreen';
+import TeamScreen from './src/screens/TeamScreen';
 import type { RootStackParamList, TabParamList } from './src/types/navigation';
 import { FavouritesProvider } from './src/context/FavouritesContext';
+import { TeamProvider } from './src/context/TeamContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,9 +59,25 @@ function Tabs() {
         component={FavouritesScreen}
         options={{
           tabBarLabel: 'Favourites',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ focused }) => (
             <Text style={{ fontSize: 20 }}>{focused ? '❤️' : '🤍'}</Text>
           ),
+        }}
+      />
+      <Tab.Screen
+        name="Quiz"
+        component={QuizScreen}
+        options={{
+          tabBarLabel: 'Quiz',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>❓</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Team"
+        component={TeamScreen}
+        options={{
+          tabBarLabel: 'Team',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚔️</Text>,
         }}
       />
     </Tab.Navigator>
@@ -69,6 +88,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FavouritesProvider>
+      <TeamProvider>
       <SafeAreaProvider>
         <NavigationContainer>
           <StatusBar style="light" />
@@ -85,6 +105,7 @@ export default function App() {
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
+      </TeamProvider>
       </FavouritesProvider>
     </QueryClientProvider>
   );
