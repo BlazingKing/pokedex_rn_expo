@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -24,6 +25,7 @@ import type { EvoStageInfo } from '../types/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import TypeBadge from '../components/TypeBadge';
 import StatBar from '../components/StatBar';
+import { computeDefenseMatchup } from '../utils/typeMatchup';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -31,12 +33,14 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 
-const TABS = ['About', 'Stats', 'Evolution'];
+const TABS = ['About', 'Stats', 'Evolution', 'Matchup'];
 
 export default function DetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const [tab, setTab] = useState(0);
   const [shiny, setShiny] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   const { data: pokemon, isLoading } = usePokemon(id);
   const { data: species } = usePokemonSpecies(id);
@@ -49,6 +53,27 @@ export default function DetailScreen({ route, navigation }: Props) {
       </View>
     );
   }
+
+  const playCry = async () => {
+    const url = pokemon.cries?.latest;
+    if (!url || playing) return;
+    try {
+      setPlaying(true);
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: url });
+      soundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) setPlaying(false);
+      });
+      await sound.playAsync();
+    } catch {
+      setPlaying(false);
+    }
+  };
 
   const primaryType = pokemon.types[0]?.type.name ?? 'normal';
   const colors = TYPE_COLORS[primaryType] ?? TYPE_COLORS.normal;
@@ -81,7 +106,7 @@ export default function DetailScreen({ route, navigation }: Props) {
         </Text>
         <Text style={styles.genus}>{genus}</Text>
 
-        {/* Types + Shiny badge */}
+        {/* Types + Shiny badge + Cry button */}
         <View style={styles.typesRow}>
           {pokemon.types.map((t) => (
             <TypeBadge key={t.type.name} type={t.type.name} />
@@ -92,6 +117,15 @@ export default function DetailScreen({ route, navigation }: Props) {
             activeOpacity={0.75}
           >
             <Text style={[styles.shinyText, shiny && styles.shinyTextActive]}>✨ SHINY</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={playCry}
+            style={[styles.shinyBadge, playing && styles.cryBadgeActive]}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.shinyText, playing && styles.cryTextActive]}>
+              {playing ? '🔊 ...' : '🔊 CRY'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -121,6 +155,7 @@ export default function DetailScreen({ route, navigation }: Props) {
           {tab === 0 && <AboutTab pokemon={pokemon} flavorText={flavorText} />}
           {tab === 1 && <StatsTab pokemon={pokemon} />}
           {tab === 2 && <EvoTab stages={evoStages} currentName={pokemon.name} onPress={(name) => navigation.replace('Detail', { id: name, name })} />}
+          {tab === 3 && <MatchupTab types={pokemon.types.map((t) => t.type.name)} />}
         </View>
       </ScrollView>
     </View>
@@ -201,6 +236,40 @@ function EvoTab({ stages, currentName, onPress }: { stages: EvoStageInfo[]; curr
           )}
         </React.Fragment>
       ))}
+    </View>
+  );
+}
+
+function MatchupTab({ types }: { types: string[] }) {
+  const matchup = computeDefenseMatchup(types);
+
+  const sections: Array<{ label: string; multiplier: string; key: keyof typeof matchup; color: string }> = [
+    { label: 'Weak ×4', multiplier: '×4', key: 'quad', color: '#EF4444' },
+    { label: 'Weak ×2', multiplier: '×2', key: 'double', color: '#F97316' },
+    { label: 'Resists ×½', multiplier: '×½', key: 'half', color: '#22C55E' },
+    { label: 'Resists ×¼', multiplier: '×¼', key: 'quarter', color: '#0EA5E9' },
+    { label: 'Immune ×0', multiplier: '×0', key: 'immune', color: '#818CF8' },
+  ];
+
+  return (
+    <View style={styles.matchupContainer}>
+      {sections.map(({ label, multiplier, key, color }) => {
+        const typeList = matchup[key];
+        if (typeList.length === 0) return null;
+        return (
+          <View key={key} style={styles.matchupSection}>
+            <View style={styles.matchupHeader}>
+              <Text style={[styles.matchupMultiplier, { color }]}>{multiplier}</Text>
+              <Text style={styles.matchupLabel}>{label}</Text>
+            </View>
+            <View style={styles.matchupTypes}>
+              {typeList.map((t) => (
+                <TypeBadge key={t} type={t} />
+              ))}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -351,4 +420,12 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   evoLevelText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  cryBadgeActive: { backgroundColor: '#3B82F620', borderColor: '#60A5FA80' },
+  cryTextActive: { color: '#60A5FA' },
+  matchupContainer: { gap: 20 },
+  matchupSection: { gap: 10 },
+  matchupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchupMultiplier: { fontSize: 18, fontWeight: '900', minWidth: 36 },
+  matchupLabel: { color: '#64748B', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  matchupTypes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 });

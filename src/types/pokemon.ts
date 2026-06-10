@@ -46,6 +46,10 @@ export interface Pokemon {
   stats: PokemonStat[];
   abilities: PokemonAbility[];
   sprites: PokemonSprites;
+  cries: {
+    latest: string | null;
+    legacy: string | null;
+  };
 }
 
 export interface PokemonSpecies {
