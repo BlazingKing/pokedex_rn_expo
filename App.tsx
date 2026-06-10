@@ -13,6 +13,7 @@ import CompareScreen from './src/screens/CompareScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import TeamScreen from './src/screens/TeamScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import ProgressScreen from './src/screens/ProgressScreen';
 import type { RootStackParamList, TabParamList } from './src/types/navigation';
 import { FavouritesProvider } from './src/context/FavouritesContext';
 import { TeamProvider } from './src/context/TeamContext';
@@ -80,6 +81,14 @@ function Tabs() {
         options={{
           tabBarLabel: 'Team',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚔️</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Progress"
+        component={ProgressScreen}
+        options={{
+          tabBarLabel: 'Progress',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📊</Text>,
         }}
       />
     </Tab.Navigator>

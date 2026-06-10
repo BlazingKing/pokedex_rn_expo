@@ -10,4 +10,5 @@ export type TabParamList = {
   Favourites: undefined;
   Quiz: undefined;
   Team: undefined;
+  Progress: undefined;
 };
