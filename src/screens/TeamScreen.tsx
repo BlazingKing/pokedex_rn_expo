@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTeam } from '../context/TeamContext';
-import { usePokemon, usePokemonList, useGen1PokemonList } from '../hooks/usePokemon';
+import { usePokemon, usePokemonList } from '../hooks/usePokemon';
 import { getPokemonImageUrl, getPokemonId } from '../utils/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import { ATTACK_CHART, ALL_TYPES } from '../constants/typeMatchup';
@@ -223,17 +223,17 @@ function CoverageAnalysis({ teamIds }: { teamIds: number[] }) {
 function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const { addMember, removeMember, isInTeam, isFull } = useTeam();
-  const { data } = useGen1PokemonList();
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = usePokemonList();
 
   const allPokemon = useMemo(
-    () => data?.results ?? [],
+    () => data?.pages.flatMap((p) => p.results) ?? [],
     [data]
   );
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return allPokemon.slice(0, 30);
+    if (!query.trim()) return allPokemon;
     const q = query.toLowerCase();
-    return allPokemon.filter((p) => p.name.includes(q)).slice(0, 30);
+    return allPokemon.filter((p) => p.name.includes(q));
   }, [query, allPokemon]);
 
   return (
@@ -263,6 +263,9 @@ function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: (
           keyExtractor={(item) => item.name}
           numColumns={2}
           contentContainerStyle={styles.pickerGrid}
+          onEndReached={() => { if (hasNextPage && !query) fetchNextPage(); }}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color="#818CF8" style={{ marginVertical: 16 }} /> : null}
           renderItem={({ item }) => {
             const id = getPokemonId(item.url);
             const inTeam = isInTeam(id);
