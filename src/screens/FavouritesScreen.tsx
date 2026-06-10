@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
-import { useFavourites } from '../hooks/useFavourites';
+import { useFavourites } from '../context/FavouritesContext';
 import { usePokemon } from '../hooks/usePokemon';
 import PokemonCard from '../components/PokemonCard';
 import PokemonCardSkeleton from '../components/PokemonCardSkeleton';

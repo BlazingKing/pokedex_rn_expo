@@ -11,6 +11,7 @@ import DetailScreen from './src/screens/DetailScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import type { RootStackParamList, TabParamList } from './src/types/navigation';
+import { FavouritesProvider } from './src/context/FavouritesContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,6 +68,7 @@ function Tabs() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <FavouritesProvider>
       <SafeAreaProvider>
         <NavigationContainer>
           <StatusBar style="light" />
@@ -83,6 +85,7 @@ export default function App() {
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
+      </FavouritesProvider>
     </QueryClientProvider>
   );
 }
