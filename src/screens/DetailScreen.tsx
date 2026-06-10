@@ -110,7 +110,7 @@ export default function DetailScreen({ route, navigation }: Props) {
         </Text>
         <Text style={styles.genus}>{genus}</Text>
 
-        {/* Types + Shiny badge + Cry button */}
+        {/* Row 1: Types + Shiny */}
         <View style={styles.typesRow}>
           {pokemon.types.map((t) => (
             <TypeBadge key={t.type.name} type={t.type.name} />
@@ -122,13 +122,17 @@ export default function DetailScreen({ route, navigation }: Props) {
           >
             <Text style={[styles.shinyText, shiny && styles.shinyTextActive]}>✨ SHINY</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Row 2: Actions */}
+        <View style={styles.actionsRow}>
           <TouchableOpacity
             onPress={playCry}
-            style={[styles.shinyBadge, playing && styles.cryBadgeActive]}
+            style={[styles.actionBadge, playing && styles.cryBadgeActive]}
             activeOpacity={0.75}
           >
             <Text style={[styles.shinyText, playing && styles.cryTextActive]}>
-              {playing ? '🔊 ...' : '🔊 CRY'}
+              {playing ? '🔊 Playing…' : '🔊 Cry'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -137,10 +141,10 @@ export default function DetailScreen({ route, navigation }: Props) {
               if (randomId === pokemon.id) randomId = randomId === 151 ? 1 : randomId + 1;
               navigation.navigate('Battle', { idA: pokemon.id, idB: randomId });
             }}
-            style={styles.shinyBadge}
+            style={[styles.actionBadge, styles.battleBadge]}
             activeOpacity={0.75}
           >
-            <Text style={styles.shinyText}>⚔️ BATTLE</Text>
+            <Text style={[styles.shinyText, styles.battleText]}>⚔️ Battle</Text>
           </TouchableOpacity>
         </View>
 
@@ -331,7 +335,21 @@ const styles = StyleSheet.create({
   heroNumber: { color: '#334155', fontSize: 14, fontWeight: '700', letterSpacing: 1, marginTop: 8 },
   heroName: { color: '#F1F5F9', fontSize: 36, fontWeight: '900', letterSpacing: -1 },
   genus: { color: '#64748B', fontSize: 13, marginBottom: 10 },
-  typesRow: { flexDirection: 'row', marginBottom: 12 },
+  typesRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, gap: 4 },
+  actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  actionBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: '#1E293B40',
+    borderColor: '#334155',
+  },
+  battleBadge: {
+    backgroundColor: '#EF444420',
+    borderColor: '#EF444450',
+  },
+  battleText: { color: '#FCA5A5' },
   glowOrb: {
     position: 'absolute',
     right: -40,
