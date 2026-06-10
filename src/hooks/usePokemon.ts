@@ -32,6 +32,13 @@ export const usePokemonSpecies = (nameOrId: string | number) =>
     enabled: !!nameOrId,
   });
 
+export const useGen1PokemonList = () =>
+  useQuery({
+    queryKey: ['pokemon-gen1-full'],
+    queryFn: () => fetchPokemonList(151, 0),
+    staleTime: Infinity,
+  });
+
 export const useEvolutionChain = (url: string | undefined) =>
   useQuery({
     queryKey: ['evolution-chain', url],

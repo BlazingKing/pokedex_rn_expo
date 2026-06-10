@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTeam } from '../context/TeamContext';
-import { usePokemon, usePokemonList } from '../hooks/usePokemon';
+import { usePokemon, usePokemonList, useGen1PokemonList } from '../hooks/usePokemon';
 import { getPokemonImageUrl, getPokemonId } from '../utils/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import { ATTACK_CHART, ALL_TYPES } from '../constants/typeMatchup';
@@ -222,10 +222,10 @@ function CoverageAnalysis({ teamIds }: { teamIds: number[] }) {
 function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const { addMember, isInTeam, isFull } = useTeam();
-  const { data } = usePokemonList();
+  const { data } = useGen1PokemonList();
 
   const allPokemon = useMemo(
-    () => data?.pages.flatMap((p) => p.results) ?? [],
+    () => data?.results ?? [],
     [data]
   );
 
