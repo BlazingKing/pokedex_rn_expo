@@ -55,8 +55,9 @@ export default function DetailScreen({ route, navigation }: Props) {
   }
 
   const playCry = async () => {
-    const url = pokemon.cries?.latest;
-    if (!url || playing) return;
+    if (playing) return;
+    // Showdown MP3 works on both iOS and Android (PokéAPI OGG is Android-only)
+    const url = `https://play.pokemonshowdown.com/audio/cries/${pokemon.name}.mp3`;
     try {
       setPlaying(true);
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
