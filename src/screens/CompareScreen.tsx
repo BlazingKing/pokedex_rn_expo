@@ -16,6 +16,7 @@ import { usePokemon } from '../hooks/usePokemon';
 import { getPokemonImageUrl, formatStatName, formatHeight, formatWeight } from '../utils/pokemon';
 import { TYPE_COLORS, STAT_COLORS } from '../constants/typeColors';
 import TypeBadge from '../components/TypeBadge';
+import RadarChart from '../components/RadarChart';
 import type { Pokemon } from '../types/pokemon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Compare'>;
@@ -83,6 +84,29 @@ export default function CompareScreen({ route, navigation }: Props) {
             />
           )}
         </View>
+
+        {/* Radar chart overlay */}
+        {pokeA && pokeB && (
+          <View style={styles.radarSection}>
+            <Text style={styles.sectionTitle}>STAT CHART</Text>
+            <RadarChart
+              stats={pokeA.stats.map((s) => ({ name: s.stat.name, value: s.base_stat }))}
+              color="#818CF8"
+              secondStats={pokeB.stats.map((s) => ({ name: s.stat.name, value: s.base_stat }))}
+              secondColor="#F97316"
+            />
+            <View style={styles.radarLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#818CF8' }]} />
+                <Text style={styles.legendName}>{pokeA.name.charAt(0).toUpperCase() + pokeA.name.slice(1)}</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F97316' }]} />
+                <Text style={styles.legendName}>{pokeB.name.charAt(0).toUpperCase() + pokeB.name.slice(1)}</Text>
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -224,4 +248,9 @@ const styles = StyleSheet.create({
   totalLabel: { color: '#64748B', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   totalVal: { color: '#94A3B8', fontSize: 18, fontWeight: '900', width: (W - 48 - 54) / 2, textAlign: 'center' },
   winnerTotal: { color: '#FACC15' },
+  radarSection: { marginTop: 24, gap: 12 },
+  radarLegend: { flexDirection: 'row', justifyContent: 'center', gap: 24 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendName: { color: '#94A3B8', fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
 });

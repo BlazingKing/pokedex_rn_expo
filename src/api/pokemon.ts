@@ -30,3 +30,8 @@ export const searchPokemon = async (query: string): Promise<Pokemon> => {
   const { data } = await api.get<Pokemon>(`/pokemon/${query.toLowerCase()}`);
   return data;
 };
+
+export const fetchMoveDetail = async (nameOrId: string | number) => {
+  const { data } = await api.get(`/move/${nameOrId}`);
+  return data;
+};
