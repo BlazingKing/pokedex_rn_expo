@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePokemonList, usePokemon, usePokemonByGen } from '../hooks/usePokemon';
-import { useFavourites } from '../hooks/useFavourites';
+import { useFavourites } from '../context/FavouritesContext';
 import { useCompare } from '../hooks/useCompare';
 import { getPokemonId } from '../utils/pokemon';
 import PokemonCard from '../components/PokemonCard';
