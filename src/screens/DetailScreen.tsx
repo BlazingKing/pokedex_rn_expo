@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -40,11 +40,16 @@ export default function DetailScreen({ route, navigation }: Props) {
   const [tab, setTab] = useState(0);
   const [shiny, setShiny] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
 
   const { data: pokemon, isLoading } = usePokemon(id);
   const { data: species } = usePokemonSpecies(id);
   const { data: evoChain } = useEvolutionChain(species?.evolution_chain.url);
+
+  // useAudioPlayer must be called unconditionally (hook rules)
+  const cryUrl = pokemon
+    ? `https://play.pokemonshowdown.com/audio/cries/${pokemon.name}.mp3`
+    : null;
+  const player = useAudioPlayer(cryUrl ? { uri: cryUrl } : null);
 
   if (isLoading || !pokemon) {
     return (
@@ -55,21 +60,19 @@ export default function DetailScreen({ route, navigation }: Props) {
   }
 
   const playCry = async () => {
-    const url = pokemon.cries?.latest;
-    if (!url || playing) return;
+    if (playing) return;
     try {
       setPlaying(true);
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-      const { sound } = await Audio.Sound.createAsync({ uri: url });
-      soundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) setPlaying(false);
-      });
-      await sound.playAsync();
+      await setAudioModeAsync({ playsInSilentMode: true });
+      player.seekTo(0);
+      player.play();
+      // poll for finish since expo-audio player doesn't expose onFinish directly here
+      const check = setInterval(() => {
+        if (!player.playing) {
+          setPlaying(false);
+          clearInterval(check);
+        }
+      }, 200);
     } catch {
       setPlaying(false);
     }
