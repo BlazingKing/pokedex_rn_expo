@@ -1,5 +1,5 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { fetchPokemon, fetchPokemonList, fetchPokemonSpecies, fetchEvolutionChain } from '../api/pokemon';
+import { fetchPokemon, fetchPokemonList, fetchPokemonSpecies, fetchEvolutionChain, fetchMoveDetail } from '../api/pokemon';
 import type { GenInfo } from '../constants/generations';
 
 export const usePokemonList = () =>
@@ -36,6 +36,14 @@ export const useGen1PokemonList = () =>
   useQuery({
     queryKey: ['pokemon-gen1-full'],
     queryFn: () => fetchPokemonList(151, 0),
+    staleTime: Infinity,
+  });
+
+export const useMoveDetail = (nameOrId: string | number) =>
+  useQuery({
+    queryKey: ['move', nameOrId],
+    queryFn: () => fetchMoveDetail(nameOrId),
+    enabled: !!nameOrId,
     staleTime: Infinity,
   });
 

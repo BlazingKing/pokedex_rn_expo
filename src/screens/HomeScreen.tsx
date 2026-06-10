@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePokemonList, usePokemon, usePokemonByGen } from '../hooks/usePokemon';
 import { useFavourites } from '../context/FavouritesContext';
+import { useTracker } from '../context/TrackerContext';
 import { useCompare } from '../hooks/useCompare';
 import { getPokemonId } from '../utils/pokemon';
 import PokemonCard from '../components/PokemonCard';
@@ -37,6 +38,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const { toggle: favToggle, isFav } = useFavourites();
+  const { caught, isCaught, markCaught } = useTracker();
   const { selected, toggle: compareToggle, clear: compareClear, isSelected, isReady } = useCompare();
 
   const genInfo = GENERATIONS[activeGen];
@@ -82,6 +84,8 @@ export default function HomeScreen({ navigation }: Props) {
           onFavToggle={() => favToggle(id)}
           isCompareSelected={isSelected(id)}
           onCompareToggle={() => compareToggle(id)}
+          isCaught={isCaught(id)}
+          onCaughtToggle={() => markCaught(id)}
         />
       );
     },
@@ -118,6 +122,9 @@ export default function HomeScreen({ navigation }: Props) {
           </Text>
         </View>
       )}
+
+      {/* Caught progress bar */}
+      <CaughtProgress caught={caught} activeGen={activeGen} />
 
       {/* Compare floating bar */}
       {selected.length > 0 && (
@@ -182,7 +189,7 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 function PokemonCardItem({
-  id, navigation, typeFilter, isFav, onFavToggle, isCompareSelected, onCompareToggle,
+  id, navigation, typeFilter, isFav, onFavToggle, isCompareSelected, onCompareToggle, isCaught, onCaughtToggle,
 }: {
   id: number;
   navigation: Nav;
@@ -191,6 +198,8 @@ function PokemonCardItem({
   onFavToggle: () => void;
   isCompareSelected: boolean;
   onCompareToggle: () => void;
+  isCaught: boolean;
+  onCaughtToggle: () => void;
 }) {
   const { data: pokemon } = usePokemon(id);
   if (!pokemon) return <PokemonCardSkeleton />;
@@ -204,7 +213,42 @@ function PokemonCardItem({
       onFavToggle={onFavToggle}
       isCompareSelected={isCompareSelected}
       onCompareToggle={onCompareToggle}
+      isCaught={isCaught}
+      onCaughtToggle={onCaughtToggle}
     />
+  );
+}
+
+function CaughtProgress({ caught, activeGen }: { caught: number[]; activeGen: string }) {
+  const genInfo = GENERATIONS[activeGen];
+  let total: number;
+  let caughtInGen: number;
+  let glowColor: string;
+
+  if (activeGen === 'all') {
+    total = 1025;
+    caughtInGen = caught.length;
+    glowColor = '#818CF8';
+  } else {
+    total = genInfo.limit;
+    const start = genInfo.offset + 1;
+    const end = genInfo.offset + genInfo.limit;
+    caughtInGen = caught.filter((id) => id >= start && id <= end).length;
+    glowColor = genInfo.glow;
+  }
+
+  const pct = Math.min(total > 0 ? caughtInGen / total : 0, 1);
+
+  return (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressLabelRow}>
+        <Text style={styles.progressLabel}>CAUGHT</Text>
+        <Text style={[styles.progressCount, { color: glowColor }]}>{caughtInGen} / {total}</Text>
+      </View>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${pct * 100}%`, backgroundColor: glowColor }]} />
+      </View>
+    </View>
   );
 }
 
@@ -332,4 +376,10 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   searchResult: { padding: 16, maxWidth: '50%' },
   notFound: { color: '#475569', textAlign: 'center', marginTop: 40, fontSize: 16 },
+  progressContainer: { paddingHorizontal: 20, paddingBottom: 8 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  progressLabel: { color: '#475569', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  progressCount: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  progressTrack: { height: 4, backgroundColor: '#1E293B', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
 });

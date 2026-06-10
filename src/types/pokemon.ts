@@ -50,6 +50,7 @@ export interface Pokemon {
     latest: string | null;
     legacy: string | null;
   };
+  moves: PokemonMove[];
 }
 
 export interface PokemonSpecies {
@@ -79,6 +80,24 @@ export interface EvolutionLink {
   species: { name: string; url: string };
   evolution_details: EvolutionDetail[];
   evolves_to: EvolutionLink[];
+}
+
+export interface MoveDetail {
+  id: number;
+  name: string;
+  power: number | null;
+  accuracy: number | null;
+  pp: number;
+  type: { name: string };
+  damage_class: { name: string };
+}
+
+export interface PokemonMove {
+  move: { name: string; url: string };
+  version_group_details: Array<{
+    move_learn_method: { name: string };
+    level_learned_at: number;
+  }>;
 }
 
 export interface EvoStageInfo {

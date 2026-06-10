@@ -25,6 +25,7 @@ import type { EvoStageInfo } from '../types/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import TypeBadge from '../components/TypeBadge';
 import StatBar from '../components/StatBar';
+import RadarChart from '../components/RadarChart';
 import { computeDefenseMatchup } from '../utils/typeMatchup';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
@@ -130,6 +131,17 @@ export default function DetailScreen({ route, navigation }: Props) {
               {playing ? '🔊 ...' : '🔊 CRY'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              let randomId = Math.floor(Math.random() * 151) + 1;
+              if (randomId === pokemon.id) randomId = randomId === 151 ? 1 : randomId + 1;
+              navigation.navigate('Battle', { idA: pokemon.id, idB: randomId });
+            }}
+            style={styles.shinyBadge}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.shinyText}>⚔️ BATTLE</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Glow orb */}
@@ -190,8 +202,10 @@ function InfoBox({ label, value }: { label: string; value: string }) {
 
 function StatsTab({ pokemon }: { pokemon: any }) {
   const total = pokemon.stats.reduce((sum: number, s: any) => sum + s.base_stat, 0);
+  const radarStats = pokemon.stats.map((s: any) => ({ name: s.stat.name, value: s.base_stat }));
   return (
     <View style={styles.statsContainer}>
+      <RadarChart stats={radarStats} />
       {pokemon.stats.map((s: any) => (
         <StatBar key={s.stat.name} name={s.stat.name} value={s.base_stat} />
       ))}

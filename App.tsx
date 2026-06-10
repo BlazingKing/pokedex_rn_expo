@@ -12,9 +12,11 @@ import FavouritesScreen from './src/screens/FavouritesScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import TeamScreen from './src/screens/TeamScreen';
+import BattleScreen from './src/screens/BattleScreen';
 import type { RootStackParamList, TabParamList } from './src/types/navigation';
 import { FavouritesProvider } from './src/context/FavouritesContext';
 import { TeamProvider } from './src/context/TeamContext';
+import { TrackerProvider } from './src/context/TrackerContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +90,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FavouritesProvider>
+      <TrackerProvider>
       <TeamProvider>
       <SafeAreaProvider>
         <NavigationContainer>
@@ -102,10 +105,12 @@ export default function App() {
             <Stack.Screen name="Tabs" component={Tabs} />
             <Stack.Screen name="Detail" component={DetailScreen} />
             <Stack.Screen name="Compare" component={CompareScreen} />
+            <Stack.Screen name="Battle" component={BattleScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
       </TeamProvider>
+      </TrackerProvider>
       </FavouritesProvider>
     </QueryClientProvider>
   );

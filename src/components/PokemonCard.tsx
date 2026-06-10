@@ -13,6 +13,9 @@ interface Props {
   onFavToggle?: () => void;
   isCompareSelected?: boolean;
   onCompareToggle?: () => void;
+  isCaught?: boolean;
+  onCaughtToggle?: () => void;
+  isSeenOnly?: boolean;
 }
 
 export default function PokemonCard({
@@ -22,6 +25,9 @@ export default function PokemonCard({
   onFavToggle,
   isCompareSelected = false,
   onCompareToggle,
+  isCaught = false,
+  onCaughtToggle,
+  isSeenOnly = false,
 }: Props) {
   const primaryType = pokemon.types[0]?.type.name ?? 'normal';
   const colors = TYPE_COLORS[primaryType] ?? TYPE_COLORS.normal;
@@ -53,6 +59,20 @@ export default function PokemonCard({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Caught/Seen badge */}
+        {(isCaught || isSeenOnly || onCaughtToggle) && (
+          <TouchableOpacity
+            onPress={onCaughtToggle}
+            style={styles.caughtBadge}
+            disabled={!onCaughtToggle}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Text style={styles.caughtBadgeText}>
+              {isCaught ? '✓' : isSeenOnly ? '◎' : '○'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Number */}
         <Text style={styles.number}>#{String(pokemon.id).padStart(4, '0')}</Text>
@@ -154,6 +174,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
   },
+  caughtBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 10,
+  },
+  caughtBadgeText: { color: '#94A3B8', fontSize: 10, fontWeight: '700' },
   borderGlow: {
     position: 'absolute',
     top: 0,
