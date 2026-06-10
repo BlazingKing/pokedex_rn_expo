@@ -19,6 +19,7 @@ import { getPokemonImageUrl, getPokemonId } from '../utils/pokemon';
 import { TYPE_COLORS } from '../constants/typeColors';
 import { ATTACK_CHART, ALL_TYPES } from '../constants/typeMatchup';
 import TypeBadge from '../components/TypeBadge';
+import PokemonCard from '../components/PokemonCard';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -221,7 +222,7 @@ function CoverageAnalysis({ teamIds }: { teamIds: number[] }) {
 
 function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
-  const { addMember, isInTeam, isFull } = useTeam();
+  const { addMember, removeMember, isInTeam, isFull } = useTeam();
   const { data } = useGen1PokemonList();
 
   const allPokemon = useMemo(
@@ -260,22 +261,19 @@ function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.name}
-          numColumns={3}
+          numColumns={2}
           contentContainerStyle={styles.pickerGrid}
           renderItem={({ item }) => {
             const id = getPokemonId(item.url);
             const inTeam = isInTeam(id);
             return (
               <PickerItem
-                name={item.name}
                 id={id}
                 inTeam={inTeam}
                 disabled={isFull && !inTeam}
-                onPress={() => {
-                  if (!inTeam && !isFull) {
-                    addMember(id);
-                    if (isFull) onClose();
-                  }
+                onToggle={() => {
+                  if (inTeam) removeMember(id);
+                  else if (!isFull) addMember(id);
                 }}
               />
             );
@@ -287,41 +285,27 @@ function PokemonPickerModal({ visible, onClose }: { visible: boolean; onClose: (
 }
 
 function PickerItem({
-  name,
   id,
   inTeam,
   disabled,
-  onPress,
+  onToggle,
 }: {
-  name: string;
   id: number;
   inTeam: boolean;
   disabled: boolean;
-  onPress: () => void;
+  onToggle: () => void;
 }) {
-  const itemW = (W - 48 - 16) / 3;
+  const { data: pokemon } = usePokemon(id);
+  if (!pokemon) return <View style={styles.pickerItemPlaceholder} />;
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      disabled={disabled && !inTeam}
-      style={[
-        styles.pickerItem,
-        { width: itemW },
-        inTeam && styles.pickerItemSelected,
-        disabled && !inTeam && styles.pickerItemDisabled,
-      ]}
-    >
-      <Image
-        source={{ uri: getPokemonImageUrl(id) }}
-        style={styles.pickerImage}
-        resizeMode="contain"
+    <View style={[styles.pickerItemWrapper, disabled && !inTeam && styles.pickerItemDisabled]}>
+      <PokemonCard
+        pokemon={pokemon}
+        onPress={onToggle}
+        isCompareSelected={inTeam}
+        onCompareToggle={onToggle}
       />
-      <Text style={styles.pickerName} numberOfLines={1}>
-        {name.charAt(0).toUpperCase() + name.slice(1)}
-      </Text>
-      {inTeam && <Text style={styles.pickerCheck}>✓</Text>}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -446,28 +430,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  pickerGrid: { paddingHorizontal: 24, gap: 8 },
-  pickerItem: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginRight: 8,
-    marginBottom: 8,
-    position: 'relative',
-  },
-  pickerItemSelected: { borderColor: '#818CF8', backgroundColor: '#818CF820' },
-  pickerItemDisabled: { opacity: 0.4 },
-  pickerImage: { width: 64, height: 64 },
-  pickerName: { color: '#94A3B8', fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
-  pickerCheck: {
-    position: 'absolute',
-    top: 4,
-    right: 6,
-    color: '#818CF8',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+  pickerGrid: { paddingHorizontal: 6 },
+  pickerItemWrapper: { flex: 1 },
+  pickerItemPlaceholder: { flex: 1, margin: 6, minHeight: 180 },
+  pickerItemDisabled: { opacity: 0.35 },
+  pickerItemSelected: {},
 });
